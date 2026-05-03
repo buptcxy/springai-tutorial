@@ -1,5 +1,7 @@
 package com.example.springai.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -46,15 +48,11 @@ import java.util.List;
 @RequestMapping("/api/chat")
 public class ChatController {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
+
     private final ChatClient chatClient;
     private final ChatModel chatModel;
 
-    /**
-     * 构造函数注入 ChatClient 和 ChatModel
-     *
-     * @param chatClient  高级聊天客户端（由 AiConfig 中定义的 Bean 注入）
-     * @param chatModel   底层聊天模型（由 Spring AI Starter 自动配置注入）
-     */
     public ChatController(ChatClient chatClient, ChatModel chatModel) {
         this.chatClient = chatClient;
         this.chatModel = chatModel;
@@ -68,18 +66,23 @@ public class ChatController {
      * .user() 设置用户消息，.call() 执行同步调用，
      * .content() 获取 AI 回复的纯文本内容。
      *
-     * 测试命令：
-     *   curl "http://localhost:8080/api/chat?message=你好，请介绍一下Spring AI"
-     *
      * @param message 用户输入的消息
      * @return AI 的回复文本
      */
     @GetMapping
     public String chat(@RequestParam(defaultValue = "你好") String message) {
-        return chatClient.prompt()
+        log.info("[基础聊天] 收到请求 - 用户消息: {}", message);
+        long startTime = System.currentTimeMillis();
+
+        String result = chatClient.prompt()
                 .user(message)
                 .call()
                 .content();
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("[基础聊天] 请求完成 - 耗时: {}ms, 回复长度: {}字符", elapsed, result != null ? result.length() : 0);
+        log.debug("[基础聊天] AI 回复内容: {}", result);
+        return result;
     }
 
     /**
@@ -94,21 +97,26 @@ public class ChatController {
      *   - 行为约束："只回答与编程相关的问题"
      *   - 语言设定："请用中文回答"
      *
-     * 测试命令：
-     *   curl "http://localhost:8080/api/chat/system?message=介绍一下你自己"
-     *
      * @param message 用户输入的消息
      * @return AI 基于系统提示词设定的角色回复
      */
     @GetMapping("/system")
     public String chatWithSystemPrompt(@RequestParam(defaultValue = "介绍一下你自己") String message) {
-        return chatClient.prompt()
-                .system("你是一位幽默风趣的编程导师，擅长用生动的比喻解释技术概念。" +
-                        "回答问题时：1）先用一个通俗的比喻引入；2）再给出技术解释；" +
-                        "3）最后提供一个代码示例。请用中文回答。")
+        String systemPrompt = "你是一位幽默风趣的编程导师，擅长用生动的比喻解释技术概念。" +
+                "回答问题时：1）先用一个通俗的比喻引入；2）再给出技术解释；" +
+                "3）最后提供一个代码示例。请用中文回答。";
+        log.info("[系统提示词] 收到请求 - 用户消息: {}, 系统提示词长度: {}字符", message, systemPrompt.length());
+        long startTime = System.currentTimeMillis();
+
+        String result = chatClient.prompt()
+                .system(systemPrompt)
                 .user(message)
                 .call()
                 .content();
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("[系统提示词] 请求完成 - 耗时: {}ms, 回复长度: {}字符", elapsed, result != null ? result.length() : 0);
+        return result;
     }
 
     /**
@@ -121,9 +129,6 @@ public class ChatController {
      *   - 中 temperature（0.4~0.7）：适合日常对话、翻译等平衡场景
      *   - 高 temperature（0.8~1.5）：适合创意写作、头脑风暴等需要创造性的场景
      *
-     * 测试命令：
-     *   curl "http://localhost:8080/api/chat/params?message=写一首关于编程的诗&temperature=1.2"
-     *
      * @param message     用户输入的消息
      * @param temperature 温度参数，控制随机性
      * @param maxTokens   最大生成 token 数
@@ -135,7 +140,10 @@ public class ChatController {
             @RequestParam(defaultValue = "0.7") Double temperature,
             @RequestParam(defaultValue = "1024") Integer maxTokens) {
 
-        return chatClient.prompt()
+        log.info("[参数调整] 收到请求 - 用户消息: {}, temperature: {}, maxTokens: {}", message, temperature, maxTokens);
+        long startTime = System.currentTimeMillis();
+
+        String result = chatClient.prompt()
                 .user(message)
                 .options(OpenAiChatOptions.builder()
                         .temperature(temperature)
@@ -143,6 +151,10 @@ public class ChatController {
                         .build())
                 .call()
                 .content();
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("[参数调整] 请求完成 - 耗时: {}ms, 回复长度: {}字符", elapsed, result != null ? result.length() : 0);
+        return result;
     }
 
     /**
@@ -160,26 +172,28 @@ public class ChatController {
      *   - metadata：元数据（模型名称、token 用量等）
      *   - generations：生成结果列表（支持一次生成多个回复）
      *
-     * 测试命令：
-     *   curl "http://localhost:8080/api/chat/prompt?message=什么是微服务架构"
-     *
      * @param message 用户输入的消息
      * @return 包含回复内容和 token 用量信息的结果
      */
     @GetMapping("/prompt")
     public String chatWithPrompt(@RequestParam(defaultValue = "什么是微服务架构") String message) {
-        // 构建 Prompt：包含系统消息和用户消息
+        log.info("[Prompt API] 收到请求 - 用户消息: {}", message);
+        long startTime = System.currentTimeMillis();
+
         Prompt prompt = new Prompt(List.of(
                 new SystemMessage("你是一位软件架构专家，回答要简洁专业。"),
                 new UserMessage(message)
         ));
+        log.debug("[Prompt API] 构建 Prompt 完成 - 消息数量: {}", prompt.getInstructions().size());
 
-        // 调用 ChatModel 获取完整响应
         ChatResponse response = chatModel.call(prompt);
 
-        // 从响应中提取信息
         String content = response.getResult().getOutput().getText();
         var usage = response.getMetadata().getUsage();
+        long elapsed = System.currentTimeMillis() - startTime;
+
+        log.info("[Prompt API] 请求完成 - 耗时: {}ms, 输入Token: {}, 输出Token: {}, 总Token: {}",
+                elapsed, usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
 
         return String.format("""
                 ========================================
@@ -190,11 +204,13 @@ public class ChatController {
                 - 输入 Token：%d
                 - 输出 Token：%d
                 - 总计 Token：%d
+                - 响应耗时：%dms
                 ========================================
                 """,
                 content,
                 usage.getPromptTokens(),
                 usage.getCompletionTokens(),
-                usage.getTotalTokens());
+                usage.getTotalTokens(),
+                elapsed);
     }
 }

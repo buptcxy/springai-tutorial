@@ -1,5 +1,7 @@
 package com.example.springai.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,6 +56,8 @@ import reactor.core.publisher.Flux;
 @RequestMapping("/api/chat/stream")
 public class StreamingChatController {
 
+    private static final Logger log = LoggerFactory.getLogger(StreamingChatController.class);
+
     private final ChatClient chatClient;
 
     public StreamingChatController(ChatClient chatClient) {
@@ -66,42 +70,24 @@ public class StreamingChatController {
      * 使用 ChatClient 的 stream() 方法进行流式调用。
      * 返回类型是 Flux<String>，Spring WebFlux 会将其转换为 SSE 流。
      *
-     * 客户端接收方式：
-     *
-     * 1. curl 命令行：
-     *    curl -N "http://localhost:8080/api/chat/stream?message=写一首关于春天的诗"
-     *    （-N 参数禁用缓冲，实时显示接收到的数据）
-     *
-     * 2. JavaScript EventSource：
-     *    const eventSource = new EventSource(
-     *        '/api/chat/stream?message=写一首关于春天的诗'
-     *    );
-     *    eventSource.onmessage = (event) => {
-     *        document.getElementById('output').textContent += event.data;
-     *    };
-     *
-     * 3. JavaScript fetch + ReadableStream：
-     *    const response = await fetch(
-     *        '/api/chat/stream?message=写一首关于春天的诗'
-     *    );
-     *    const reader = response.body.getReader();
-     *    const decoder = new TextDecoder();
-     *    while (true) {
-     *        const { done, value } = await reader.read();
-     *        if (done) break;
-     *        document.getElementById('output').textContent += decoder.decode(value);
-     *    }
-     *
      * @param message 用户输入的消息
      * @return Flux<String> 流式响应，每个元素是一个文本片段
      */
     @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> streamChat(@RequestParam(defaultValue = "写一首关于春天的诗") String message) {
+        log.info("[流式聊天] 收到请求 - 用户消息: {}", message);
+        long startTime = System.currentTimeMillis();
+
         return chatClient.prompt()
                 .system("你是一位诗人，擅长创作优美的中文诗歌。")
                 .user(message)
                 .stream()
-                .content();
+                .content()
+                .doOnComplete(() -> {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    log.info("[流式聊天] 流式响应完成 - 耗时: {}ms", elapsed);
+                })
+                .doOnError(e -> log.error("[流式聊天] 流式响应出错: {}", e.getMessage()));
     }
 
     /**
@@ -110,19 +96,24 @@ public class StreamingChatController {
      * 演示在流式模式下同时使用系统提示词。
      * 系统提示词在流式调用中的作用与同步调用完全一致。
      *
-     * 测试命令：
-     *   curl -N "http://localhost:8080/api/chat/stream/code?message=解释什么是递归"
-     *
      * @param message 用户输入的消息
      * @return Flux<String> 流式响应
      */
     @GetMapping(value = "/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> streamCodeChat(@RequestParam(defaultValue = "解释什么是递归") String message) {
+        log.info("[流式代码] 收到请求 - 用户消息: {}", message);
+        long startTime = System.currentTimeMillis();
+
         return chatClient.prompt()
                 .system("你是一位编程导师，回答要包含代码示例。" +
                         "使用 Markdown 代码块格式，并标注语言类型。")
                 .user(message)
                 .stream()
-                .content();
+                .content()
+                .doOnComplete(() -> {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    log.info("[流式代码] 流式响应完成 - 耗时: {}ms", elapsed);
+                })
+                .doOnError(e -> log.error("[流式代码] 流式响应出错: {}", e.getMessage()));
     }
 }

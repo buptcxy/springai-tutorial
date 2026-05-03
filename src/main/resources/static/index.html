@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring AI 教程 - 测试控制台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; }
+
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 30px; }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+
+        .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+        .tab { padding: 8px 18px; border: 1px solid #d9d9d9; border-radius: 6px; background: white;
+               cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        .tab:hover { border-color: #667eea; color: #667eea; }
+        .tab.active { background: #667eea; color: white; border-color: #667eea; }
+
+        .panel { display: none; background: white; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 24px; }
+        .panel.active { display: block; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #555; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px;
+            font-size: 14px; transition: border-color 0.2s; outline: none; }
+        .form-group input:focus, .form-group textarea:focus { border-color: #667eea; }
+        .form-group textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+        .form-row { display: flex; gap: 16px; }
+        .form-row .form-group { flex: 1; }
+
+        .btn { padding: 10px 28px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;
+               transition: all 0.2s; font-weight: 500; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a6fd6; }
+        .btn-primary:disabled { background: #b0b8d6; cursor: not-allowed; }
+        .btn-danger { background: #ff4d4f; color: white; margin-left: 10px; }
+        .btn-danger:hover { background: #e04345; }
+
+        .result-area { margin-top: 16px; background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px;
+                       padding: 16px; min-height: 80px; max-height: 500px; overflow-y: auto; }
+        .result-area .label { font-size: 12px; color: #999; margin-bottom: 8px; }
+        .result-area .content { font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+        .result-area .content.streaming { border-right: 2px solid #667eea; animation: blink 1s step-end infinite; }
+        @keyframes blink { 50% { border-color: transparent; } }
+
+        .chat-history { margin-top: 12px; }
+        .chat-msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; max-width: 85%; line-height: 1.6; font-size: 14px; }
+        .chat-msg.user { background: #667eea; color: white; margin-left: auto; text-align: right; }
+        .chat-msg.ai { background: #f0f0f0; color: #333; }
+
+        .desc { font-size: 13px; color: #888; margin-bottom: 16px; padding: 10px; background: #f8f9ff; border-radius: 6px; border-left: 3px solid #667eea; }
+
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #667eea;
+                   border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🤖 Spring AI 教程 - 测试控制台</h1>
+    <p>基于 Spring AI 1.0.5 + MiniMax M2.7 | 9 个教程示例，浏览器内直接调试</p>
+</div>
+
+<div class="container">
+    <div class="tabs">
+        <div class="tab active" data-panel="chat">① 基础聊天</div>
+        <div class="tab" data-panel="system">② 系统提示词</div>
+        <div class="tab" data-panel="params">③ 参数调整</div>
+        <div class="tab" data-panel="prompt">④ Prompt API</div>
+        <div class="tab" data-panel="stream">⑤ 流式响应</div>
+        <div class="tab" data-panel="multi">⑥ 多轮对话</div>
+    </div>
+
+    <!-- ① 基础聊天 -->
+    <div class="panel active" id="panel-chat">
+        <div class="desc">使用 ChatClient 的 Fluent API 进行基本对话，最简单的 Spring AI 调用方式。</div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="chat-msg" value="你好，请介绍一下Spring AI" placeholder="输入你想问的问题">
+        </div>
+        <button class="btn btn-primary" onclick="doChat()">发送</button>
+        <div class="result-area">
+            <div class="label">AI 回复</div>
+            <div class="content" id="chat-result">等待发送...</div>
+        </div>
+    </div>
+
+    <!-- ② 系统提示词 -->
+    <div class="panel" id="panel-system">
+        <div class="desc">通过系统提示词设定 AI 角色。这里 AI 被设定为"幽默编程导师"，会用比喻解释技术概念。</div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="system-msg" value="什么是多线程" placeholder="输入你想问的问题">
+        </div>
+        <button class="btn btn-primary" onclick="doSystemChat()">发送</button>
+        <div class="result-area">
+            <div class="label">AI 回复（编程导师角色）</div>
+            <div class="content" id="system-result">等待发送...</div>
+        </div>
+    </div>
+
+    <!-- ③ 参数调整 -->
+    <div class="panel" id="panel-params">
+        <div class="desc">动态调整 temperature 和 maxTokens 参数。temperature 越高越有创造性，越低越确定。</div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="params-msg" value="写一首关于编程的诗" placeholder="输入你想问的问题">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Temperature（0.0~2.0）</label>
+                <input type="number" id="params-temp" value="1.2" min="0" max="2" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Max Tokens</label>
+                <input type="number" id="params-tokens" value="1024" min="1" max="4096" step="1">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="doParamsChat()">发送</button>
+        <div class="result-area">
+            <div class="label">AI 回复</div>
+            <div class="content" id="params-result">等待发送...</div>
+        </div>
+    </div>
+
+    <!-- ④ Prompt API -->
+    <div class="panel" id="panel-prompt">
+        <div class="desc">使用底层 ChatModel + Prompt API，可获取完整的 Token 用量统计信息。</div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="prompt-msg" value="什么是微服务架构" placeholder="输入你想问的问题">
+        </div>
+        <button class="btn btn-primary" onclick="doPromptChat()">发送</button>
+        <div class="result-area">
+            <div class="label">AI 回复（含 Token 统计）</div>
+            <div class="content" id="prompt-result">等待发送...</div>
+        </div>
+    </div>
+
+    <!-- ⑤ 流式响应 -->
+    <div class="panel" id="panel-stream">
+        <div class="desc">流式响应（SSE），AI 回复会像打字机一样逐字显示，体验更自然。</div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="stream-msg" value="写一首关于春天的诗" placeholder="输入你想问的问题">
+        </div>
+        <button class="btn btn-primary" onclick="doStreamChat()">发送</button>
+        <button class="btn btn-danger" onclick="stopStream()" id="stream-stop" style="display:none">停止</button>
+        <div class="result-area">
+            <div class="label">AI 回复（流式输出）</div>
+            <div class="content streaming" id="stream-result">等待发送...</div>
+        </div>
+    </div>
+
+    <!-- ⑥ 多轮对话 -->
+    <div class="panel" id="panel-multi">
+        <div class="desc">多轮对话记忆，AI 能记住同一会话中的上下文。试试先告诉 AI 你的名字，再问它你叫什么。</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>会话 ID</label>
+                <input type="text" id="multi-session" value="my-session-1" placeholder="同一 ID 共享记忆">
+            </div>
+            <div class="form-group" style="flex:0 0 auto; display:flex; align-items:flex-end;">
+                <button class="btn btn-danger" onclick="clearMemory()" style="margin-bottom:0">清除记忆</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="multi-msg" placeholder="输入消息后按回车或点击发送" onkeydown="if(event.key==='Enter')doMultiChat()">
+        </div>
+        <button class="btn btn-primary" onclick="doMultiChat()">发送</button>
+        <div class="chat-history" id="multi-history"></div>
+    </div>
+</div>
+
+<script>
+    const BASE = '';
+
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+        });
+    });
+
+    // 通用 GET 请求
+    async function apiGet(url) {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(`HTTP ${resp.status}: ${text}`);
+        }
+        return resp.text();
+    }
+
+    // ① 基础聊天
+    async function doChat() {
+        const msg = document.getElementById('chat-msg').value;
+        const el = document.getElementById('chat-result');
+        el.textContent = '⏳ 思考中...';
+        try {
+            const result = await apiGet(`${BASE}/api/chat?message=${encodeURIComponent(msg)}`);
+            el.textContent = result;
+        } catch (e) { el.textContent = '❌ 错误: ' + e.message; }
+    }
+
+    // ② 系统提示词
+    async function doSystemChat() {
+        const msg = document.getElementById('system-msg').value;
+        const el = document.getElementById('system-result');
+        el.textContent = '⏳ 思考中...';
+        try {
+            const result = await apiGet(`${BASE}/api/chat/system?message=${encodeURIComponent(msg)}`);
+            el.textContent = result;
+        } catch (e) { el.textContent = '❌ 错误: ' + e.message; }
+    }
+
+    // ③ 参数调整
+    async function doParamsChat() {
+        const msg = document.getElementById('params-msg').value;
+        const temp = document.getElementById('params-temp').value;
+        const tokens = document.getElementById('params-tokens').value;
+        const el = document.getElementById('params-result');
+        el.textContent = '⏳ 思考中...';
+        try {
+            const result = await apiGet(`${BASE}/api/chat/params?message=${encodeURIComponent(msg)}&temperature=${temp}&maxTokens=${tokens}`);
+            el.textContent = result;
+        } catch (e) { el.textContent = '❌ 错误: ' + e.message; }
+    }
+
+    // ④ Prompt API
+    async function doPromptChat() {
+        const msg = document.getElementById('prompt-msg').value;
+        const el = document.getElementById('prompt-result');
+        el.textContent = '⏳ 思考中...';
+        try {
+            const result = await apiGet(`${BASE}/api/chat/prompt?message=${encodeURIComponent(msg)}`);
+            el.textContent = result;
+        } catch (e) { el.textContent = '❌ 错误: ' + e.message; }
+    }
+
+    // ⑤ 流式响应
+    let streamAbort = null;
+    async function doStreamChat() {
+        const msg = document.getElementById('stream-msg').value;
+        const el = document.getElementById('stream-result');
+        const stopBtn = document.getElementById('stream-stop');
+        el.textContent = '';
+        stopBtn.style.display = 'inline-block';
+
+        streamAbort = new AbortController();
+        try {
+            const resp = await fetch(`${BASE}/api/chat/stream?message=${encodeURIComponent(msg)}`, { signal: streamAbort.signal });
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                // 解析 SSE data: 行
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        const data = line.substring(5);
+                        if (data.trim()) {
+                            el.textContent += data;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                el.textContent += '\n❌ 错误: ' + e.message;
+            }
+        } finally {
+            stopBtn.style.display = 'none';
+            streamAbort = null;
+        }
+    }
+
+    function stopStream() {
+        if (streamAbort) { streamAbort.abort(); }
+    }
+
+    // ⑥ 多轮对话
+    async function doMultiChat() {
+        const msg = document.getElementById('multi-msg').value;
+        const session = document.getElementById('multi-session').value;
+        if (!msg.trim()) return;
+
+        const history = document.getElementById('multi-history');
+        // 显示用户消息
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-msg user';
+        userDiv.textContent = msg;
+        history.appendChild(userDiv);
+
+        // 显示加载
+        const aiDiv = document.createElement('div');
+        aiDiv.className = 'chat-msg ai';
+        aiDiv.innerHTML = '<span class="loading"></span>思考中...';
+        history.appendChild(aiDiv);
+        history.scrollTop = history.scrollHeight;
+
+        document.getElementById('multi-msg').value = '';
+
+        try {
+            const result = await apiGet(`${BASE}/api/chat/multi?message=${encodeURIComponent(msg)}&conversationId=${encodeURIComponent(session)}`);
+            aiDiv.textContent = result;
+        } catch (e) {
+            aiDiv.textContent = '❌ 错误: ' + e.message;
+        }
+        history.scrollTop = history.scrollHeight;
+    }
+
+    async function clearMemory() {
+        const session = document.getElementById('multi-session').value;
+        try {
+            const result = await apiGet(`${BASE}/api/chat/multi/clear?conversationId=${encodeURIComponent(session)}`);
+            document.getElementById('multi-history').innerHTML = '';
+            alert(result);
+        } catch (e) { alert('清除失败: ' + e.message); }
+    }
+</script>
+</body>
+</html>

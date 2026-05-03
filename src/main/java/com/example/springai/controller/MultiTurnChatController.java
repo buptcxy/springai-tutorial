@@ -1,7 +1,8 @@
 package com.example.springai.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.PromptChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
@@ -58,6 +59,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/chat/multi")
 public class MultiTurnChatController {
 
+    private static final Logger log = LoggerFactory.getLogger(MultiTurnChatController.class);
+
     private final ChatClient chatClient;
     private final ChatMemory chatMemory;
 
@@ -80,17 +83,6 @@ public class MultiTurnChatController {
      *   - PromptChatMemoryAdvisor 将历史消息合并到 system 提示词中，
      *     避免了消息角色冲突的问题
      *
-     * 测试步骤（在终端中依次执行）：
-     *
-     * 第一步 - 告诉 AI 你的名字：
-     *   curl --get "http://localhost:8081/api/chat/multi" --data-urlencode "conversationId=session1" --data-urlencode "message=我叫小明，我是一名Java开发者"
-     *
-     * 第二步 - 问 AI 你的名字（AI 能记住）：
-     *   curl --get "http://localhost:8081/api/chat/multi" --data-urlencode "conversationId=session1" --data-urlencode "message=我叫什么名字？我做什么工作？"
-     *
-     * 第三步 - 换一个会话，AI 不会知道你的名字：
-     *   curl --get "http://localhost:8081/api/chat/multi" --data-urlencode "conversationId=session2" --data-urlencode "message=我叫什么名字？"
-     *
      * @param message        用户输入的消息
      * @param conversationId 会话 ID，用于区分不同的对话
      * @return AI 的回复文本
@@ -100,7 +92,10 @@ public class MultiTurnChatController {
             @RequestParam String message,
             @RequestParam(defaultValue = "default") String conversationId) {
 
-        return chatClient.prompt()
+        log.info("[多轮对话] 收到请求 - 会话ID: {}, 用户消息: {}", conversationId, message);
+        long startTime = System.currentTimeMillis();
+
+        String result = chatClient.prompt()
                 .system("你是一个友好的对话助手，能够记住用户之前说过的话。" +
                         "请用中文回答，回答要简洁自然。")
                 .user(message)
@@ -109,6 +104,11 @@ public class MultiTurnChatController {
                         .build())
                 .call()
                 .content();
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("[多轮对话] 请求完成 - 会话ID: {}, 耗时: {}ms, 回复长度: {}字符",
+                conversationId, elapsed, result != null ? result.length() : 0);
+        return result;
     }
 
     /**
@@ -123,9 +123,6 @@ public class MultiTurnChatController {
      * 只保留最近 N 条消息作为上下文，更早的消息会被自动丢弃。
      * 这是一种简单但有效的滑动窗口策略。
      *
-     * 测试命令：
-     *   curl --get "http://localhost:8081/api/chat/multi/limited" --data-urlencode "conversationId=session3" --data-urlencode "message=你好" --data-urlencode "maxMessages=5"
-     *
      * @param message      用户输入的消息
      * @param conversationId 会话 ID
      * @param maxMessages  保留最近 N 条消息作为上下文
@@ -137,11 +134,15 @@ public class MultiTurnChatController {
             @RequestParam(defaultValue = "default") String conversationId,
             @RequestParam(defaultValue = "10") int maxMessages) {
 
+        log.info("[限制记忆] 收到请求 - 会话ID: {}, 用户消息: {}, maxMessages: {}",
+                conversationId, message, maxMessages);
+        long startTime = System.currentTimeMillis();
+
         ChatMemory limitedMemory = MessageWindowChatMemory.builder()
                 .maxMessages(maxMessages)
                 .build();
 
-        return chatClient.prompt()
+        String result = chatClient.prompt()
                 .system("你是一个友好的对话助手。请用中文回答。")
                 .user(message)
                 .advisors(PromptChatMemoryAdvisor.builder(limitedMemory)
@@ -149,6 +150,10 @@ public class MultiTurnChatController {
                         .build())
                 .call()
                 .content();
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("[限制记忆] 请求完成 - 会话ID: {}, 耗时: {}ms", conversationId, elapsed);
+        return result;
     }
 
     /**
@@ -157,15 +162,14 @@ public class MultiTurnChatController {
      * 当用户想开始一个全新的对话时，可以清除之前的记忆。
      * 清除后，该会话 ID 下之前的对话历史将不再被 AI 看到。
      *
-     * 测试命令：
-     *   curl --get "http://localhost:8081/api/chat/multi/clear" --data-urlencode "conversationId=session1"
-     *
      * @param conversationId 要清除记忆的会话 ID
      * @return 操作结果
      */
     @GetMapping("/clear")
     public String clearMemory(@RequestParam String conversationId) {
+        log.info("[清除记忆] 收到请求 - 会话ID: {}", conversationId);
         chatMemory.clear(conversationId);
+        log.info("[清除记忆] 清除完成 - 会话ID: {}", conversationId);
         return "会话 " + conversationId + " 的记忆已清除！";
     }
 }
