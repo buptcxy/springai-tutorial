@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        继承 Spring Boot 父 POM，自动管理 Spring 相关依赖的版本。
+        Spring AI 1.0.x 要求 Spring Boot 3.4.x 及以上版本。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>springai-tutorial</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>Spring AI Tutorial</name>
+    <description>Spring AI 入门教程 - 使用 MiniMax M2.7 模型</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <!-- Spring AI BOM 版本，统一管理所有 Spring AI 模块的版本 -->
+        <spring-ai.version>1.0.5</spring-ai.version>
+    </properties>
+
+    <dependencies>
+        <!--
+            Spring Boot Web Starter：提供 RESTful API 能力，
+            本教程通过 HTTP 接口来演示 Spring AI 的各项功能。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!--
+            Spring AI OpenAI Starter：Spring AI 对 OpenAI API 的封装。
+            由于 MiniMax M2.7 提供了 OpenAI 兼容接口，
+            我们可以通过此 Starter 将请求转发到 MiniMax 的服务端点。
+            这也是 Spring AI 生态中对接第三方 OpenAI 兼容服务的标准做法。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+    </dependencies>
+
+    <!--
+        Spring AI BOM（Bill of Materials）：统一管理 Spring AI 各模块的版本号，
+        避免各模块版本不一致导致兼容性问题。引入 BOM 后，
+        上面的 spring-ai-starter-model-openai 无需指定 version。
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
