@@ -64,7 +64,7 @@
 
 <div class="header">
     <h1>🤖 Spring AI 教程 - 测试控制台</h1>
-    <p>基于 Spring AI 1.0.5 + MiniMax M2.7 | 9 个教程示例，浏览器内直接调试</p>
+    <p>基于 Spring AI 1.1.5 + MiniMax M2.7 | 13 个教程示例，浏览器内直接调试</p>
 </div>
 
 <div class="container">
@@ -75,6 +75,8 @@
         <div class="tab" data-panel="prompt">④ Prompt API</div>
         <div class="tab" data-panel="stream">⑤ 流式响应</div>
         <div class="tab" data-panel="multi">⑥ 多轮对话</div>
+        <div class="tab" data-panel="structured">⑦ 结构化输出</div>
+        <div class="tab" data-panel="tool">⑧ 工具调用</div>
     </div>
 
     <!-- ① 基础聊天 -->
@@ -176,6 +178,49 @@
         </div>
         <button class="btn btn-primary" onclick="doMultiChat()">发送</button>
         <div class="chat-history" id="multi-history"></div>
+    </div>
+
+    <!-- ⑦ 结构化输出 -->
+    <div class="panel" id="panel-structured">
+        <div class="desc">让 AI 输出结构化数据，直接映射为 Java 对象（Record）、List 或 Map，无需手动解析 JSON。</div>
+        <div class="form-group">
+            <label>选择输出类型</label>
+            <select id="structured-type" onchange="onStructuredTypeChange()">
+                <option value="entity">Entity（Java Record）</option>
+                <option value="list">List（字符串列表）</option>
+                <option value="map">Map（键值对）</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="structured-msg" value="推荐一部经典的科幻电影" placeholder="输入你想问的问题">
+        </div>
+        <button class="btn btn-primary" onclick="doStructuredChat()">发送</button>
+        <div class="result-area">
+            <div class="label">AI 回复（结构化 JSON）</div>
+            <div class="content" id="structured-result" style="font-family: monospace;">等待发送...</div>
+        </div>
+    </div>
+
+    <!-- ⑧ 工具调用 -->
+    <div class="panel" id="panel-tool">
+        <div class="desc">让 AI 自动调用 Java 方法获取实时数据。AI 会判断何时需要调用工具，并基于工具返回的结果回答问题。</div>
+        <div class="form-group">
+            <label>选择工具注册方式</label>
+            <select id="tool-type">
+                <option value="annotation">@Tool 注解（声明式）</option>
+                <option value="callback">FunctionToolCallback（编程式）</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>输入消息</label>
+            <input type="text" id="tool-msg" value="北京今天天气怎么样" placeholder="试试问天气相关的问题">
+        </div>
+        <button class="btn btn-primary" onclick="doToolChat()">发送</button>
+        <div class="result-area">
+            <div class="label">AI 回复（基于工具调用结果）</div>
+            <div class="content" id="tool-result">等待发送...</div>
+        </div>
     </div>
 </div>
 
@@ -329,6 +374,46 @@
             document.getElementById('multi-history').innerHTML = '';
             alert(result);
         } catch (e) { alert('清除失败: ' + e.message); }
+    }
+
+    // ⑦ 结构化输出
+    function onStructuredTypeChange() {
+        const type = document.getElementById('structured-type').value;
+        const msgInput = document.getElementById('structured-msg');
+        const defaults = {
+            entity: '推荐一部经典的科幻电影',
+            list: '列出5种流行的编程语言',
+            map: '描述Python编程语言的特点'
+        };
+        msgInput.value = defaults[type] || '';
+    }
+
+    async function doStructuredChat() {
+        const type = document.getElementById('structured-type').value;
+        const msg = document.getElementById('structured-msg').value;
+        const el = document.getElementById('structured-result');
+        el.textContent = '⏳ 思考中...';
+        try {
+            const result = await apiGet(`${BASE}/api/chat/structured/${type}?message=${encodeURIComponent(msg)}`);
+            try {
+                const json = JSON.parse(result);
+                el.textContent = JSON.stringify(json, null, 2);
+            } catch {
+                el.textContent = result;
+            }
+        } catch (e) { el.textContent = '❌ 错误: ' + e.message; }
+    }
+
+    // ⑧ 工具调用
+    async function doToolChat() {
+        const type = document.getElementById('tool-type').value;
+        const msg = document.getElementById('tool-msg').value;
+        const el = document.getElementById('tool-result');
+        el.textContent = '⏳ 思考中（AI 可能需要调用工具）...';
+        try {
+            const result = await apiGet(`${BASE}/api/chat/tool/${type}?message=${encodeURIComponent(msg)}`);
+            el.textContent = result;
+        } catch (e) { el.textContent = '❌ 错误: ' + e.message; }
     }
 </script>
 </body>
