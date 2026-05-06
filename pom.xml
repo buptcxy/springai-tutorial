@@ -6,12 +6,12 @@
 
     <!--
         继承 Spring Boot 父 POM，自动管理 Spring 相关依赖的版本。
-        Spring AI 1.1.x 要求 Spring Boot 3.4.x 及以上版本。
+        Spring AI 1.1.x 要求 Spring Boot 3.5.x 及以上版本。
     -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.5</version>
+        <version>3.5.14</version>
         <relativePath/>
     </parent>
 
